@@ -1,0 +1,26 @@
+[
+  {
+    "categoria": "PCs armadas",
+    "nombre": "Wepay Apex 4070",
+    "precio": "$2.349.990",
+    "detalle": "RTX 4070, Ryzen 7 y refrigeración líquida."
+  },
+  {
+    "categoria": "Periféricos",
+    "nombre": "Teclado Neon Strike",
+    "precio": "$149.990",
+    "detalle": "Switches lineales, RGB por zonas y chasis metálico."
+  },
+  {
+    "categoria": "Audio",
+    "nombre": "Headset Ghost Pulse",
+    "precio": "$89.990",
+    "detalle": "Sonido envolvente, micrófono desmontable y baja latencia."
+  },
+  {
+    "categoria": "Streaming",
+    "nombre": "Kit Creator Pro",
+    "precio": "$219.990",
+    "detalle": "Brazo, luz táctil y capturadora para contenido serio."
+  }
+]
