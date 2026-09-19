@@ -1,11 +1,30 @@
 import { useEffect, useState } from 'react';
 import { useMsal } from '@azure/msal-react';
 import { InteractionStatus } from '@azure/msal-browser';
-import { Route, Routes, useNavigate } from 'react-router-dom';
+import { NavLink, Route, Routes, useNavigate } from 'react-router-dom';
 import { tokenRequest } from './authConfig';
 import { fetchConToken } from './apiClient';
 import RutaProtegida from './components/RutaProtegida';
 import './App.css';
+
+type Producto = {
+  name: string;
+  description: string;
+  price: number;
+};
+
+function PrivateTabs() {
+  return (
+    <nav className="page-tabs" aria-label="Secciones privadas">
+      <NavLink className="page-tab" to="/perfil">
+        Perfil
+      </NavLink>
+      <NavLink className="page-tab" to="/productos">
+        Catálogo
+      </NavLink>
+    </nav>
+  );
+}
 
 function HomePage() {
   const { instance, accounts, inProgress } = useMsal();
@@ -172,6 +191,8 @@ function PerfilPage() {
         </div>
       </header>
 
+      <PrivateTabs />
+
       <section className="showcase-layout">
         <div className="catalog-section card">
           <div className="section-heading">
@@ -238,6 +259,111 @@ function PerfilPage() {
   );
 }
 
+function ProductosPage() {
+  const { instance, accounts, inProgress } = useMsal();
+  const [productos, setProductos] = useState<Producto[]>([]);
+  const [salida, setSalida] = useState('');
+  const [ocupado, setOcupado] = useState(false);
+  const account = instance.getActiveAccount() ?? accounts[0];
+  const bloqueado = ocupado || inProgress !== InteractionStatus.None;
+
+  useEffect(() => {
+    document.title = 'Wepay | Catálogo';
+  }, []);
+
+  async function consultarProductos() {
+    if (!account) return;
+    setOcupado(true);
+    setSalida('');
+    try {
+      const response = await fetchConToken(instance, account, '/api/productos', {
+        method: 'GET',
+      });
+      const texto = await response.text();
+      if (!response.ok) {
+        throw new Error(`Error catálogo ${response.status}: ${texto}`);
+      }
+      setProductos(JSON.parse(texto) as Producto[]);
+    } catch (error) {
+      setProductos([]);
+      setSalida(error instanceof Error ? error.message : String(error));
+    } finally {
+      setOcupado(false);
+    }
+  }
+
+  async function salir() {
+    if (account) {
+      await instance.logoutPopup({ account });
+    }
+  }
+
+  return (
+    <main className="wepay-page">
+      <header className="topbar">
+        <div className="brand-lockup">
+          <span className="brand-mark">W</span>
+          <div>
+            <p className="eyebrow">Catálogo privado</p>
+            <strong>Wepay</strong>
+          </div>
+        </div>
+        <div className="topbar-actions">
+          <span className="status-pill">Sesión privada</span>
+          <button className="ghost-button" disabled={bloqueado} onClick={() => void salir()}>
+            Cerrar sesión
+          </button>
+        </div>
+      </header>
+
+      <PrivateTabs />
+
+      <section className="catalog-section card">
+        <div className="section-heading catalog-heading">
+          <div>
+            <p className="eyebrow">Productos disponibles</p>
+            <h1>Catálogo gamer</h1>
+          </div>
+          <button className="primary-button" disabled={bloqueado} onClick={() => void consultarProductos()}>
+            {ocupado ? 'Cargando...' : 'Actualizar catálogo'}
+          </button>
+        </div>
+
+        {salida ? <p className="catalog-error">{salida}</p> : null}
+        {productos.length > 0 ? (
+          <div className="catalog-grid">
+            {productos.map((producto) => (
+              <article className="product-card" key={`${producto.name}-${producto.price}`}>
+                <span className="product-category">Producto Wepay</span>
+                <h2>{producto.name}</h2>
+                <p>{producto.description}</p>
+                <div className="product-footer">
+                  <strong className="product-price">
+                    {new Intl.NumberFormat('es-CL', {
+                      style: 'currency',
+                      currency: 'CLP',
+                      maximumFractionDigits: 0,
+                    }).format(producto.price)}
+                  </strong>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div className="catalog-empty">
+            <h2>{ocupado ? 'Consultando el BFF...' : 'El catálogo está listo'}</h2>
+            <p>
+              {ocupado
+                ? 'Estamos obteniendo los productos protegidos.'
+                : 'Actualiza el catálogo para consultar los productos disponibles.'}
+            </p>
+          </div>
+        )}
+      </section>
+    </main>
+  );
+}
+
 export default function App() {
   return (
     <Routes>
@@ -247,6 +373,14 @@ export default function App() {
         element={
           <RutaProtegida>
             <PerfilPage />
+          </RutaProtegida>
+        }
+      />
+      <Route
+        path="/productos"
+        element={
+          <RutaProtegida>
+            <ProductosPage />
           </RutaProtegida>
         }
       />
