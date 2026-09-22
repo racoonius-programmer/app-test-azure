@@ -13,6 +13,14 @@ type Producto = {
   price: number;
 };
 
+type Pedido = {
+  id: number;
+  usuarioOid: string;
+  total: number;
+  fechaRegistro: string;
+  estado: string;
+};
+
 function PrivateTabs() {
   return (
     <nav className="page-tabs" aria-label="Secciones privadas">
@@ -21,6 +29,9 @@ function PrivateTabs() {
       </NavLink>
       <NavLink className="page-tab" to="/productos">
         Catálogo
+      </NavLink>
+      <NavLink className="page-tab" to="/pedidos">
+        Pedidos
       </NavLink>
     </nav>
   );
@@ -364,6 +375,144 @@ function ProductosPage() {
   );
 }
 
+function PedidosPage() {
+  const { instance, accounts, inProgress } = useMsal();
+  const [pedidos, setPedidos] = useState<Pedido[]>([]);
+  const [salida, setSalida] = useState('');
+  const [ocupado, setOcupado] = useState(false);
+  const account = instance.getActiveAccount() ?? accounts[0];
+  const bloqueado = ocupado || inProgress !== InteractionStatus.None;
+
+  useEffect(() => {
+    document.title = 'Wepay | Pedidos';
+  }, []);
+
+  async function consultarPedidos() {
+    if (!account) return;
+    setOcupado(true);
+    setSalida('');
+    try {
+      const response = await fetchConToken(instance, account, '/api/pedidos', {
+        method: 'GET',
+      });
+      const texto = await response.text();
+      if (!response.ok) {
+        throw new Error(`Error pedidos ${response.status}: ${texto}`);
+      }
+      setPedidos(JSON.parse(texto) as Pedido[]);
+    } catch (error) {
+      setPedidos([]);
+      setSalida(error instanceof Error ? error.message : String(error));
+    } finally {
+      setOcupado(false);
+    }
+  }
+
+  async function crearPedidoDePrueba() {
+    if (!account) return;
+    setOcupado(true);
+    setSalida('');
+    try {
+      const response = await fetchConToken(instance, account, '/api/pedidos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          items: [
+            { nombre: 'Teclado mecánico gamer RedBack', precio: 79990, cantidad: 1 },
+          ],
+        }),
+      });
+      const texto = await response.text();
+      if (!response.ok) {
+        throw new Error(`Error al crear pedido ${response.status}: ${texto}`);
+      }
+      await consultarPedidos();
+    } catch (error) {
+      setSalida(error instanceof Error ? error.message : String(error));
+    } finally {
+      setOcupado(false);
+    }
+  }
+
+  async function salir() {
+    if (account) {
+      await instance.logoutPopup({ account });
+    }
+  }
+
+  return (
+    <main className="wepay-page">
+      <header className="topbar">
+        <div className="brand-lockup">
+          <span className="brand-mark">W</span>
+          <div>
+            <p className="eyebrow">Pedidos privados</p>
+            <strong>Wepay</strong>
+          </div>
+        </div>
+        <div className="topbar-actions">
+          <span className="status-pill">Sesión privada</span>
+          <button className="ghost-button" disabled={bloqueado} onClick={() => void salir()}>
+            Cerrar sesión
+          </button>
+        </div>
+      </header>
+
+      <PrivateTabs />
+
+      <section className="catalog-section card">
+        <div className="section-heading catalog-heading">
+          <div>
+            <p className="eyebrow">Historial</p>
+            <h1>Mis pedidos</h1>
+          </div>
+          <div className="hero-actions">
+            <button className="ghost-button" disabled={bloqueado} onClick={() => void crearPedidoDePrueba()}>
+              Crear pedido de prueba
+            </button>
+            <button className="primary-button" disabled={bloqueado} onClick={() => void consultarPedidos()}>
+              {ocupado ? 'Cargando...' : 'Actualizar pedidos'}
+            </button>
+          </div>
+        </div>
+
+        {salida ? <p className="catalog-error">{salida}</p> : null}
+        {pedidos.length > 0 ? (
+          <div className="catalog-grid">
+            {pedidos.map((pedido) => (
+              <article className="product-card" key={pedido.id}>
+                <span className="product-category">Pedido #{pedido.id}</span>
+                <h2>{pedido.estado}</h2>
+                <p>
+                  {new Date(pedido.fechaRegistro).toLocaleString('es-CL')}
+                </p>
+                <div className="product-footer">
+                  <strong className="product-price">
+                    {new Intl.NumberFormat('es-CL', {
+                      style: 'currency',
+                      currency: 'CLP',
+                      maximumFractionDigits: 0,
+                    }).format(pedido.total)}
+                  </strong>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div className="catalog-empty">
+            <h2>{ocupado ? 'Consultando el BFF...' : 'Sin pedidos cargados'}</h2>
+            <p>
+              {ocupado
+                ? 'Estamos obteniendo tus pedidos protegidos.'
+                : 'Crea un pedido de prueba o actualiza para ver tu historial.'}
+            </p>
+          </div>
+        )}
+      </section>
+    </main>
+  );
+}
+
 export default function App() {
   return (
     <Routes>
@@ -381,6 +530,14 @@ export default function App() {
         element={
           <RutaProtegida>
             <ProductosPage />
+          </RutaProtegida>
+        }
+      />
+      <Route
+        path="/pedidos"
+        element={
+          <RutaProtegida>
+            <PedidosPage />
           </RutaProtegida>
         }
       />
