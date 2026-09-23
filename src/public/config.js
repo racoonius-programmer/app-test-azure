@@ -1,0 +1,5 @@
+window.RUNTIME_CONFIG = {
+  VITE_ENTRA_TENANT_ID: "",
+  VITE_API_CLIENT_ID: "",
+  VITE_BFF_BASE_URL: ""
+};
